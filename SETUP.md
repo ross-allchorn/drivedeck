@@ -62,6 +62,10 @@ Anyone who has this link can see and download the music in that folder. Subfolde
 | S / R | Shuffle / Repeat |
 | Enter / Delete | Play / remove the selected playlist track |
 
+On a computer, drag any window by its blue title bar. Windows snap to each other and to the edges of the browser, and their positions are remembered. **RESET LAYOUT** puts them back. On phones and tablets, the windows stay stacked.
+
+The **LIGHT / DARK** button in the main title bar switches themes. Until you press it, DriveDeck follows your device's setting.
+
 Click the time to switch between elapsed and remaining. Click the analyzer to switch between spectrum, oscilloscope and off. Double-click a slider to reset it.
 
 ## If something doesn't work

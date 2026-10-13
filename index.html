@@ -3,24 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1b2330">
+<meta name="theme-color" content="#1a2230">
 <title>DriveDeck</title>
+<script>
+/* apply a saved light/dark choice before first paint to avoid a flash */
+try{ var p = JSON.parse(localStorage.getItem('dd.prefs') || '{}');
+  if(p.theme === 'light' || p.theme === 'dark') document.documentElement.setAttribute('data-theme', p.theme); }catch(e){}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen&family=Chakra+Petch:wght@400;600&display=swap">
 <style>
 /* Layout: three beveled "windows" (main, EQ, playlist) on a dithered desktop.
    Stacked on phones; main+EQ left and playlist right on wide screens. */
+/* Dark-first: gunmetal case + phosphor LCD. Light: platinum case + reflective green LCD. */
 :root{
   color-scheme: dark;
   --desk:#1a2230; --desk-dot:#222c3d;
-  --case:#2f343d; --face:#3b414c; --hi:#5d6573; --lo:#111317;
-  --lcd-bg:#050906; --lcd:#5cf08c; --lcd-dim:#16361f; --amber:#ffb53d; --hot:#ff5b48;
-  --title-a:#2a4a80; --title-b:#172a52; --sel:#1d3f8f;
-  --text:#d9dee7; --muted:#8c95a5;
+  --case:#2f343d; --face:#3b414c; --hi:#5d6573; --lo:#111317; --thumb-hi:#8a93a3;
+  --lcd-bg:#050906; --lcd:#5cf08c; --lcd-dim:#16361f; --lcd-mid:#3f8a58; --lcd-off:#3a5a45; --lcd-line:#2a5a39;
+  --lcd-hint:#3c6b4a; --cur:#ffffff; --peak:#d9dee7;
+  --amber:#ffb53d; --hot:#ff5b48; --status:#ffb53d;
+  --title-a:#2a4a80; --title-b:#172a52; --title-fg:#dfe7ff; --sel:#1d3f8f;
+  --text:#d9dee7; --muted:#8c95a5; --shade:rgba(0,0,0,.55); --veil:rgba(8,12,20,.65);
   --f-lcd:"VT323", ui-monospace, Menlo, Consolas, monospace;
   --f-pix:"Silkscreen", ui-monospace, Menlo, Consolas, monospace;
   --f-ui:"Chakra Petch", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --desk:#d5dbe3; --desk-dot:#c4ccd7;
+    --case:#c3c7ce; --face:#d6d9de; --hi:#ffffff; --lo:#5f6670; --thumb-hi:#ffffff;
+    --lcd-bg:#a9b993; --lcd:#17240f; --lcd-dim:#93a57c; --lcd-mid:#3e5530; --lcd-off:#748a62; --lcd-line:#5d7550;
+    --lcd-hint:#5d7550; --cur:#000000; --peak:#3a4a2c;
+    --amber:#9a5a00; --hot:#b3261e; --status:#8a4b00;
+    --title-a:#3a64ad; --title-b:#22447f; --title-fg:#f2f6ff; --sel:#8fa877;
+    --text:#1b1f27; --muted:#4f5662; --shade:rgba(40,50,70,.35); --veil:rgba(60,70,90,.35);
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --desk:#d5dbe3; --desk-dot:#c4ccd7;
+  --case:#c3c7ce; --face:#d6d9de; --hi:#ffffff; --lo:#5f6670; --thumb-hi:#ffffff;
+  --lcd-bg:#a9b993; --lcd:#17240f; --lcd-dim:#93a57c; --lcd-mid:#3e5530; --lcd-off:#748a62; --lcd-line:#5d7550;
+  --lcd-hint:#5d7550; --cur:#000000; --peak:#3a4a2c;
+  --amber:#9a5a00; --hot:#b3261e; --status:#8a4b00;
+  --title-a:#3a64ad; --title-b:#22447f; --title-fg:#f2f6ff; --sel:#8fa877;
+  --text:#1b1f27; --muted:#4f5662; --shade:rgba(40,50,70,.35); --veil:rgba(60,70,90,.35);
 }
 *{box-sizing:border-box}
 html{background:var(--desk)}
@@ -45,17 +75,17 @@ body{
 .win{
   background:var(--case);
   border:2px solid; border-color:var(--hi) var(--lo) var(--lo) var(--hi);
-  box-shadow:0 0 0 1px #000, 0 12px 32px rgba(0,0,0,.55);
+  box-shadow:0 0 0 1px var(--lo), 0 12px 32px var(--shade);
   padding:0 8px 8px; min-width:0;
 }
 .tbar{
   display:flex; align-items:center; gap:8px; height:22px; margin:0 -8px 8px; padding:0 8px;
   background:linear-gradient(var(--title-a), var(--title-b));
-  font:10px var(--f-pix); letter-spacing:.14em; color:#dfe7ff; user-select:none;
+  font:10px var(--f-pix); letter-spacing:.14em; color:var(--title-fg); user-select:none;
 }
 .tbar .grip{flex:1; height:7px; background:repeating-linear-gradient(to bottom, rgba(255,255,255,.28) 0 1px, transparent 1px 3px)}
 .tbar .tbtn{
-  font:10px var(--f-pix); color:#dfe7ff; background:transparent; border:1px solid rgba(255,255,255,.35);
+  font:10px var(--f-pix); color:var(--title-fg); background:transparent; border:1px solid rgba(255,255,255,.35);
   height:16px; padding:0 6px; cursor:pointer; letter-spacing:.08em;
 }
 .tbar .tbtn:hover{background:rgba(255,255,255,.12)}
@@ -75,25 +105,25 @@ body{
 }
 .btn:active{border-color:var(--lo) var(--hi) var(--hi) var(--lo); background:var(--case)}
 .btn:disabled{opacity:.45; cursor:default}
-.btn[aria-pressed]::before{content:""; width:6px; height:6px; background:var(--lcd-dim); box-shadow:inset 0 0 0 1px #000}
+.btn[aria-pressed]::before{content:""; width:6px; height:6px; background:var(--lcd-dim); box-shadow:inset 0 0 0 1px var(--lo)}
 .btn[aria-pressed="true"]::before{background:var(--lcd); box-shadow:0 0 6px var(--lcd)}
 .btn svg{width:14px; height:14px; fill:currentColor}
-.btn.warn{color:var(--amber)}
+.btn.warn{color:var(--status)}
 :focus-visible{outline:2px solid var(--amber); outline-offset:1px}
 @media (pointer:coarse){ .btn{min-height:42px} }
 
 input[type=range]{-webkit-appearance:none; appearance:none; background:transparent; margin:0; height:18px; cursor:pointer}
 input[type=range]::-webkit-slider-runnable-track{height:6px; background:var(--lcd-bg); border:1px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
 input[type=range]::-moz-range-track{height:6px; background:var(--lcd-bg); border:1px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:12px; margin-top:-4px; background:linear-gradient(var(--hi), var(--face)); border:1px solid; border-color:#8a93a3 var(--lo) var(--lo) #8a93a3}
-input[type=range]::-moz-range-thumb{width:14px; height:10px; border-radius:0; background:linear-gradient(var(--hi), var(--face)); border:1px solid; border-color:#8a93a3 var(--lo) var(--lo) #8a93a3}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:12px; margin-top:-4px; background:linear-gradient(var(--hi), var(--face)); border:1px solid; border-color:var(--thumb-hi) var(--lo) var(--lo) var(--thumb-hi)}
+input[type=range]::-moz-range-thumb{width:14px; height:10px; border-radius:0; background:linear-gradient(var(--hi), var(--face)); border:1px solid; border-color:var(--thumb-hi) var(--lo) var(--lo) var(--thumb-hi)}
 @media (pointer:coarse){ input[type=range]{height:30px} input[type=range]::-webkit-slider-thumb{width:22px; height:18px; margin-top:-7px} }
 
 .field{
   font:16px var(--f-lcd); color:var(--lcd); background:var(--lcd-bg); min-height:30px; padding:2px 8px; width:100%; min-width:0;
   border:2px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo);
 }
-.field::placeholder{color:#3c6b4a}
+.field::placeholder{color:var(--lcd-hint)}
 select.field{font-size:16px}
 .lbl{font:10px var(--f-pix); letter-spacing:.1em; color:var(--muted); text-transform:uppercase}
 
@@ -139,20 +169,20 @@ select.field{font-size:16px}
 .pltop{display:flex; gap:6px; margin-bottom:6px}
 .list{height:300px; overflow:auto; font-size:19px; line-height:1.15; outline:none; overscroll-behavior:contain}
 .trk{display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; gap:8px; padding:2px 6px; cursor:default; user-select:none}
-.trk .n{color:var(--lcd-dim); color:#3f8a58; font-variant-numeric:tabular-nums}
+.trk .n{color:var(--lcd-mid); font-variant-numeric:tabular-nums}
 .trk .t{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.trk .s{font:9px var(--f-pix); color:#3f8a58; align-self:center; border:1px solid #2a5a39; padding:0 3px}
+.trk .s{font:9px var(--f-pix); color:var(--lcd-mid); align-self:center; border:1px solid var(--lcd-line); padding:0 3px}
 .trk .d{font-variant-numeric:tabular-nums}
 .trk.sel{background:var(--sel)}
-.trk.cur{color:#fff}
+.trk.cur{color:var(--cur)}
 .trk.cur .t::before{content:"▶ "; color:var(--amber)}
-.trk.na{color:#3a5a45}
-.trk.na .s{color:#3a5a45; border-color:#23362a}
+.trk.na{color:var(--lcd-off)}
+.trk.na .s{color:var(--lcd-off); border-color:var(--lcd-dim)}
 .empty{padding:18px 14px; font:14px/1.5 var(--f-ui); color:var(--muted)}
 .empty b{color:var(--lcd); font-weight:600}
 .plfoot{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:6px}
 .plfoot .sum{margin-left:auto; font:16px var(--f-lcd); color:var(--muted); font-variant-numeric:tabular-nums}
-#status{margin-top:6px; min-height:20px; font:13px/1.4 var(--f-ui); color:var(--amber)}
+#status{margin-top:6px; min-height:20px; font:13px/1.4 var(--f-ui); color:var(--status)}
 #status:empty{display:none}
 
 /* ---------- dialogs ---------- */
@@ -160,27 +190,34 @@ dialog{
   padding:0 12px 12px; width:min(580px, calc(100% - 32px)); max-height:calc(100% - 40px); overflow:auto;
   color:var(--text); background:var(--case);
   border:2px solid; border-color:var(--hi) var(--lo) var(--lo) var(--hi);
-  box-shadow:0 0 0 1px #000, 0 20px 60px rgba(0,0,0,.7);
+  box-shadow:0 0 0 1px var(--lo), 0 20px 60px var(--shade);
 }
-dialog::backdrop{background:rgba(8,12,20,.65)}
+dialog::backdrop{background:var(--veil)}
 dialog .tbar{margin:0 -12px 12px; position:sticky; top:0; z-index:1}
 .sect{display:grid; gap:8px; padding:10px; margin-bottom:10px; background:var(--face); border:2px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
-.sect h2{margin:0; font:11px var(--f-pix); letter-spacing:.12em; color:#dfe7ff}
+.sect h2{margin:0; font:11px var(--f-pix); letter-spacing:.12em; color:var(--text)}
 .sect p{margin:0; font-size:13px; color:var(--muted); max-width:62ch}
 .inrow{display:flex; gap:6px}
 .items{display:grid; gap:4px}
 .item{display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; padding:6px 8px; background:var(--case); border:1px solid var(--lo)}
 .item .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600}
 .item .meta{font:15px var(--f-lcd); color:var(--muted)}
-.item .meta.bad{color:var(--amber)}
+.item .meta.bad{color:var(--status)}
 .row-btns{display:flex; flex-wrap:wrap; gap:6px}
 details{font-size:13px; color:var(--muted)}
 details summary{cursor:pointer; color:var(--text)}
 details ol{margin:8px 0 0; padding-left:20px; display:grid; gap:4px}
 code{font:15px var(--f-lcd); color:var(--lcd)}
 
-.drop-hint{position:fixed; inset:0; display:grid; place-items:center; background:rgba(8,14,10,.82); z-index:50; pointer-events:none}
-.drop-hint div{font:28px var(--f-lcd); color:var(--lcd); border:2px dashed var(--lcd); padding:30px 40px}
+.drop-hint{position:fixed; inset:0; display:grid; place-items:center; background:var(--veil); backdrop-filter:blur(2px); z-index:50; pointer-events:none}
+.drop-hint div{font:28px var(--f-lcd); color:var(--lcd); background:var(--lcd-bg); border:2px dashed var(--lcd); padding:30px 40px}
+
+/* free layout: desktop windows dragged by their title bars */
+body.free .deck{display:block; max-width:none}
+body.free .win{position:absolute; margin:0}
+body.free .win > .tbar{cursor:move}
+body.free .win.dragging{box-shadow:0 0 0 1px var(--lo), 0 18px 44px var(--shade)}
+body.dragging-any{user-select:none; -webkit-user-select:none}
 
 @media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto} }
 </style>
@@ -192,6 +229,7 @@ code{font:15px var(--f-lcd); color:var(--lcd)}
   <!-- MAIN WINDOW -->
   <section class="win" id="main" aria-label="Player">
     <div class="tbar"><span class="grip"></span><span>DRIVEDECK</span><span class="grip"></span>
+      <button class="tbtn" id="themeBtn" type="button">LIGHT</button>
       <button class="tbtn" id="openSources" type="button" title="Music sources">SOURCES</button></div>
 
     <div class="display">
@@ -234,6 +272,7 @@ code{font:15px var(--f-lcd); color:var(--lcd)}
     <div class="toggles">
       <button class="btn" id="tEq" type="button" aria-pressed="true">EQ</button>
       <button class="btn" id="tPl" type="button" aria-pressed="true">PL</button>
+      <button class="btn" id="tLayout" type="button" title="Put the windows back in their original positions" hidden>RESET LAYOUT</button>
     </div>
   </section>
 
@@ -595,9 +634,12 @@ $('#time').addEventListener('click', e => { e.stopPropagation(); prefs.remain = 
 $('#vis').addEventListener('click', e => { e.stopPropagation(); prefs.vis = prefs.vis === 'spec' ? 'osc' : prefs.vis === 'osc' ? 'off' : 'spec'; savePrefs(); });
 
 const cv = $('#vis'), g = cv.getContext('2d'), W = 76, H = 22;
-const css = getComputedStyle(document.documentElement);
-const C = { bg: css.getPropertyValue('--lcd-bg').trim(), dim: css.getPropertyValue('--lcd-dim').trim(),
-            on: css.getPropertyValue('--lcd').trim(), amber: css.getPropertyValue('--amber').trim(), hot: css.getPropertyValue('--hot').trim() };
+const C = {};
+function readColors(){
+  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
+  Object.assign(C, {bg:v('--lcd-bg'), dim:v('--lcd-dim'), on:v('--lcd'), amber:v('--amber'), hot:v('--hot'), peak:v('--peak')});
+}
+readColors();
 const BARS = 19, peaks = new Float32Array(BARS), peakHold = new Float32Array(BARS);
 let fd, td, lastTime = '';
 function frame(){
@@ -634,7 +676,7 @@ function frame(){
         if(h >= peaks[b]){ peaks[b] = h; peakHold[b] = 18; }
         else if(peakHold[b] > 0) peakHold[b]--;
         else peaks[b] = Math.max(0, peaks[b] - 0.35);
-        if(peaks[b] > 0.5){ g.fillStyle = '#d9dee7'; g.fillRect(b*4, H - 1 - Math.round(peaks[b]), 3, 1); }
+        if(peaks[b] > 0.5){ g.fillStyle = C.peak; g.fillRect(b*4, H - 1 - Math.round(peaks[b]), 3, 1); }
       }
     } else peaks.fill(0);
   } else if(prefs.vis === 'osc'){
@@ -1044,6 +1086,7 @@ function renderToggles(){
   $('#tEq').setAttribute('aria-pressed', prefs.showEq); $('#eq').hidden = !prefs.showEq;
   $('#tPl').setAttribute('aria-pressed', prefs.showPl); $('#pl').hidden = !prefs.showPl;
   $('#eqOn').setAttribute('aria-pressed', prefs.eqOn);
+  ensurePlaced();
 }
 $('#bShuf').addEventListener('click', () => { prefs.shuffle = !prefs.shuffle; history = []; savePrefs(); renderToggles(); });
 $('#bRep').addEventListener('click', () => { prefs.repeat = {off:'all', all:'one', one:'off'}[prefs.repeat]; savePrefs(); renderToggles(); });
@@ -1101,9 +1144,116 @@ document.addEventListener('keydown', e => {
   if(map[k]){ e.preventDefault(); map[k](); }
 });
 
+/* ============ draggable windows (desktop only) ============ */
+const freeMQ = matchMedia('(min-width: 980px) and (hover: hover) and (pointer: fine)');
+const WINS = ['main', 'eq', 'pl'];
+const SNAP = 10;
+let zTop = 10;
+const freeOn = () => document.body.classList.contains('free');
+function placeWin(id, p){ const el = $('#' + id); el.style.left = p.x + 'px'; el.style.top = p.y + 'px'; el.style.width = p.w + 'px'; }
+function enterFree(){
+  const pos = {};
+  for(const id of WINS){
+    const el = $('#' + id); if(el.hidden) continue;
+    const r = el.getBoundingClientRect();
+    pos[id] = {x: Math.round(r.left + scrollX), y: Math.round(r.top + scrollY), w: Math.round(r.width)};
+  }
+  document.body.classList.add('free');
+  prefs.pos = pos;
+  for(const id in pos) placeWin(id, pos[id]);
+  savePrefs();
+}
+function exitFree(){
+  document.body.classList.remove('free');
+  for(const id of WINS){ const st = $('#' + id).style; st.left = st.top = st.width = st.zIndex = ''; }
+}
+function ensurePlaced(){
+  if(!freeOn() || !prefs.pos) return;
+  let changed = false;
+  for(const id of WINS){
+    const el = $('#' + id);
+    if(el.hidden || prefs.pos[id]) continue;
+    let y = 0;
+    for(const o of WINS){ const p = prefs.pos[o]; if(p && !$('#' + o).hidden) y = Math.max(y, p.y + $('#' + o).offsetHeight); }
+    prefs.pos[id] = {x: (prefs.pos.main || {x: 16}).x, y: y + 12, w: id === 'pl' ? 560 : 460};
+    placeWin(id, prefs.pos[id]); changed = true;
+  }
+  if(changed){ clampAll(); savePrefs(); }
+}
+function clampAll(){
+  if(!freeOn() || !prefs.pos) return;
+  const W = document.documentElement.clientWidth;
+  for(const id of WINS){
+    const p = prefs.pos[id]; if(!p) continue;
+    p.w = Math.min(p.w, W);
+    p.x = Math.max(0, Math.min(p.x, W - p.w)); p.y = Math.max(0, p.y);
+    placeWin(id, p);
+  }
+}
+function applyLayout(){
+  if(freeMQ.matches && prefs.pos){
+    document.body.classList.add('free');
+    for(const id of WINS) if(prefs.pos[id]) placeWin(id, prefs.pos[id]);
+    ensurePlaced(); clampAll();
+  } else exitFree();
+  $('#tLayout').hidden = !freeOn();
+}
+function snap(el, x, y){
+  const w = el.offsetWidth, h = el.offsetHeight, W = document.documentElement.clientWidth;
+  const xs = [0, W - w], ys = [0];
+  for(const o of WINS){
+    const oe = $('#' + o), p = prefs.pos[o];
+    if(oe === el || oe.hidden || !p) continue;
+    const ow = oe.offsetWidth, oh = oe.offsetHeight;
+    xs.push(p.x, p.x + ow, p.x - w, p.x + ow - w);
+    ys.push(p.y, p.y + oh, p.y - h, p.y + oh - h);
+  }
+  const near = (v, list) => { let best = v, d = SNAP + 1; for(const c of list){ const dd = Math.abs(c - v); if(dd < d){ d = dd; best = c; } } return d <= SNAP ? best : v; };
+  x = near(x, xs); y = near(y, ys);
+  return [Math.max(0, Math.min(x, W - w)), Math.max(0, y)];
+}
+document.addEventListener('pointerdown', e => {
+  const bar = e.target.closest('.win > .tbar');
+  if(!bar || e.target.closest('button') || e.button !== 0 || !freeMQ.matches) return;
+  const el = bar.parentElement, id = el.id;
+  if(!freeOn()){ enterFree(); $('#tLayout').hidden = false; }
+  e.preventDefault();
+  const p = prefs.pos[id], sx = e.pageX, sy = e.pageY, ox = p.x, oy = p.y;
+  el.style.zIndex = ++zTop; el.classList.add('dragging'); document.body.classList.add('dragging-any');
+  bar.setPointerCapture(e.pointerId);
+  const move = ev => { [p.x, p.y] = snap(el, ox + ev.pageX - sx, oy + ev.pageY - sy); placeWin(id, p); };
+  const up = () => {
+    bar.removeEventListener('pointermove', move); bar.removeEventListener('pointerup', up); bar.removeEventListener('pointercancel', up);
+    el.classList.remove('dragging'); document.body.classList.remove('dragging-any'); savePrefs();
+  };
+  bar.addEventListener('pointermove', move); bar.addEventListener('pointerup', up); bar.addEventListener('pointercancel', up);
+});
+document.addEventListener('pointerdown', e => {
+  const w = e.target.closest('.win'); if(w && freeOn()) w.style.zIndex = ++zTop;
+}, true);
+$('#tLayout').addEventListener('click', () => { delete prefs.pos; savePrefs(); exitFree(); $('#tLayout').hidden = true; });
+freeMQ.addEventListener('change', applyLayout);
+window.addEventListener('resize', clampAll);
+
+/* ============ light / dark ============ */
+const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+const isDark = () => prefs.theme ? prefs.theme === 'dark' : darkMQ.matches;
+function applyTheme(){
+  const root = document.documentElement;
+  if(prefs.theme) root.setAttribute('data-theme', prefs.theme); else root.removeAttribute('data-theme');
+  const dark = isDark(), b = $('#themeBtn');
+  b.textContent = dark ? 'LIGHT' : 'DARK';
+  b.title = 'Switch to ' + (dark ? 'light' : 'dark') + ' mode';
+  b.setAttribute('aria-label', b.title);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', getComputedStyle(root).getPropertyValue('--desk').trim());
+  readColors();
+}
+$('#themeBtn').addEventListener('click', () => { prefs.theme = isDark() ? 'light' : 'dark'; savePrefs(); applyTheme(); });
+darkMQ.addEventListener('change', () => { if(!prefs.theme) applyTheme(); });
+
 /* ============ start ============ */
 driveFolders = driveFolders.map(f => ({...f}));
-renderToggles(); renderEq(); renderList(true); renderState(); loadDirs();
+applyTheme(); applyLayout(); renderToggles(); renderEq(); renderList(true); renderState(); loadDirs();
 if(!playlist.length && !apiKey && !driveFolders.length) status('Welcome to DriveDeck. Press ADD to connect your music.', true);
 </script>
 </body>
