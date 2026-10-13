@@ -1,0 +1,1110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b2330">
+<title>DriveDeck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen&family=Chakra+Petch:wght@400;600&display=swap">
+<style>
+/* Layout: three beveled "windows" (main, EQ, playlist) on a dithered desktop.
+   Stacked on phones; main+EQ left and playlist right on wide screens. */
+:root{
+  color-scheme: dark;
+  --desk:#1a2230; --desk-dot:#222c3d;
+  --case:#2f343d; --face:#3b414c; --hi:#5d6573; --lo:#111317;
+  --lcd-bg:#050906; --lcd:#5cf08c; --lcd-dim:#16361f; --amber:#ffb53d; --hot:#ff5b48;
+  --title-a:#2a4a80; --title-b:#172a52; --sel:#1d3f8f;
+  --text:#d9dee7; --muted:#8c95a5;
+  --f-lcd:"VT323", ui-monospace, Menlo, Consolas, monospace;
+  --f-pix:"Silkscreen", ui-monospace, Menlo, Consolas, monospace;
+  --f-ui:"Chakra Petch", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--desk)}
+body{
+  margin:0; min-height:100vh; color:var(--text); font:14px/1.45 var(--f-ui);
+  background:var(--desk);
+  background-image:radial-gradient(var(--desk-dot) 1px, transparent 1px);
+  background-size:4px 4px;
+  padding-block:max(20px, env(safe-area-inset-top)) max(28px, env(safe-area-inset-bottom));
+  padding-inline:16px;
+  -webkit-tap-highlight-color:transparent;
+}
+[hidden]{display:none!important}
+.deck{display:grid; gap:12px; max-width:460px; margin:0 auto}
+@media (min-width:980px){
+  .deck{max-width:1040px; grid-template-columns:460px minmax(0,1fr); grid-template-rows:auto 1fr; align-items:start}
+  #pl{grid-column:2; grid-row:1 / span 2}
+  #pl .list{height:min(560px, calc(100vh - 230px))}
+}
+
+/* ---------- windows ---------- */
+.win{
+  background:var(--case);
+  border:2px solid; border-color:var(--hi) var(--lo) var(--lo) var(--hi);
+  box-shadow:0 0 0 1px #000, 0 12px 32px rgba(0,0,0,.55);
+  padding:0 8px 8px; min-width:0;
+}
+.tbar{
+  display:flex; align-items:center; gap:8px; height:22px; margin:0 -8px 8px; padding:0 8px;
+  background:linear-gradient(var(--title-a), var(--title-b));
+  font:10px var(--f-pix); letter-spacing:.14em; color:#dfe7ff; user-select:none;
+}
+.tbar .grip{flex:1; height:7px; background:repeating-linear-gradient(to bottom, rgba(255,255,255,.28) 0 1px, transparent 1px 3px)}
+.tbar .tbtn{
+  font:10px var(--f-pix); color:#dfe7ff; background:transparent; border:1px solid rgba(255,255,255,.35);
+  height:16px; padding:0 6px; cursor:pointer; letter-spacing:.08em;
+}
+.tbar .tbtn:hover{background:rgba(255,255,255,.12)}
+
+.lcd{
+  background:var(--lcd-bg); color:var(--lcd); font-family:var(--f-lcd);
+  border:2px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo);
+}
+
+/* ---------- buttons & sliders ---------- */
+.btn{
+  font:10px var(--f-pix); letter-spacing:.06em; color:var(--text); cursor:pointer;
+  background:linear-gradient(var(--face), var(--case));
+  border:2px solid; border-color:var(--hi) var(--lo) var(--lo) var(--hi);
+  min-height:30px; padding:0 10px; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  white-space:nowrap;
+}
+.btn:active{border-color:var(--lo) var(--hi) var(--hi) var(--lo); background:var(--case)}
+.btn:disabled{opacity:.45; cursor:default}
+.btn[aria-pressed]::before{content:""; width:6px; height:6px; background:var(--lcd-dim); box-shadow:inset 0 0 0 1px #000}
+.btn[aria-pressed="true"]::before{background:var(--lcd); box-shadow:0 0 6px var(--lcd)}
+.btn svg{width:14px; height:14px; fill:currentColor}
+.btn.warn{color:var(--amber)}
+:focus-visible{outline:2px solid var(--amber); outline-offset:1px}
+@media (pointer:coarse){ .btn{min-height:42px} }
+
+input[type=range]{-webkit-appearance:none; appearance:none; background:transparent; margin:0; height:18px; cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:6px; background:var(--lcd-bg); border:1px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+input[type=range]::-moz-range-track{height:6px; background:var(--lcd-bg); border:1px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:12px; margin-top:-4px; background:linear-gradient(var(--hi), var(--face)); border:1px solid; border-color:#8a93a3 var(--lo) var(--lo) #8a93a3}
+input[type=range]::-moz-range-thumb{width:14px; height:10px; border-radius:0; background:linear-gradient(var(--hi), var(--face)); border:1px solid; border-color:#8a93a3 var(--lo) var(--lo) #8a93a3}
+@media (pointer:coarse){ input[type=range]{height:30px} input[type=range]::-webkit-slider-thumb{width:22px; height:18px; margin-top:-7px} }
+
+.field{
+  font:16px var(--f-lcd); color:var(--lcd); background:var(--lcd-bg); min-height:30px; padding:2px 8px; width:100%; min-width:0;
+  border:2px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo);
+}
+.field::placeholder{color:#3c6b4a}
+select.field{font-size:16px}
+.lbl{font:10px var(--f-pix); letter-spacing:.1em; color:var(--muted); text-transform:uppercase}
+
+/* ---------- main window ---------- */
+.display{display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px}
+.clock{padding:4px 8px 6px; display:grid; gap:2px; cursor:pointer}
+.clock .row1{display:flex; align-items:center; gap:6px}
+.state{width:12px; height:12px; flex:none}
+.state svg{width:12px; height:12px; fill:var(--lcd)}
+#time{font-size:44px; line-height:.9; letter-spacing:.02em; font-variant-numeric:tabular-nums; min-width:4.2ch; text-align:right}
+#vis{display:block; width:152px; height:44px; image-rendering:pixelated; image-rendering:crisp-edges; cursor:pointer}
+.info{display:grid; gap:6px; min-width:0}
+#marquee{font-size:22px; line-height:1; padding:6px 6px 5px; white-space:pre; overflow:hidden}
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{font:16px/1 var(--f-lcd); padding:3px 6px; font-variant-numeric:tabular-nums}
+.chip b{font-weight:400; color:var(--muted); margin-left:4px; font-size:13px; font-family:var(--f-pix); letter-spacing:.05em}
+.seek{margin:8px 0 6px; display:block; width:100%}
+.transport{display:flex; flex-wrap:wrap; gap:4px; align-items:center}
+.transport .tp{width:40px; padding:0}
+.transport .spacer{flex:1}
+@media (max-width:480px){
+  .transport .tp{width:auto; flex:1 1 0}
+  .transport .spacer{flex-basis:100%; height:0}
+  #bShuf, #bRep{flex:1 1 0}
+}
+.mix{display:grid; grid-template-columns:auto minmax(0,1fr) auto minmax(0,0.7fr); gap:6px 10px; align-items:center; margin-top:8px}
+.mix input{width:100%}
+.toggles{display:flex; gap:4px; margin-top:8px; flex-wrap:wrap}
+
+/* ---------- equalizer ---------- */
+.eqtop{display:flex; gap:6px; align-items:center; margin-bottom:8px; flex-wrap:wrap}
+.eqtop select{flex:1; width:auto}
+.bands{display:grid; grid-template-columns:repeat(11, minmax(0,1fr)); gap:2px; align-items:end; padding:8px 4px 6px; background:var(--face); border:2px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+.band{display:grid; justify-items:center; gap:4px}
+.band:first-child{border-right:1px solid var(--lo); padding-right:2px}
+.band input{writing-mode:vertical-lr; direction:rtl; width:20px; height:110px}
+.band input::-webkit-slider-runnable-track{width:6px; height:auto}
+.band input::-webkit-slider-thumb{width:16px; height:10px; margin-top:0; margin-left:-6px}
+.band span{font:9px var(--f-pix); color:var(--muted); letter-spacing:0}
+.db{font:9px var(--f-pix); color:var(--muted); display:flex; justify-content:space-between; margin-top:4px}
+
+/* ---------- playlist ---------- */
+.pltop{display:flex; gap:6px; margin-bottom:6px}
+.list{height:300px; overflow:auto; font-size:19px; line-height:1.15; outline:none; overscroll-behavior:contain}
+.trk{display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; gap:8px; padding:2px 6px; cursor:default; user-select:none}
+.trk .n{color:var(--lcd-dim); color:#3f8a58; font-variant-numeric:tabular-nums}
+.trk .t{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.trk .s{font:9px var(--f-pix); color:#3f8a58; align-self:center; border:1px solid #2a5a39; padding:0 3px}
+.trk .d{font-variant-numeric:tabular-nums}
+.trk.sel{background:var(--sel)}
+.trk.cur{color:#fff}
+.trk.cur .t::before{content:"▶ "; color:var(--amber)}
+.trk.na{color:#3a5a45}
+.trk.na .s{color:#3a5a45; border-color:#23362a}
+.empty{padding:18px 14px; font:14px/1.5 var(--f-ui); color:var(--muted)}
+.empty b{color:var(--lcd); font-weight:600}
+.plfoot{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:6px}
+.plfoot .sum{margin-left:auto; font:16px var(--f-lcd); color:var(--muted); font-variant-numeric:tabular-nums}
+#status{margin-top:6px; min-height:20px; font:13px/1.4 var(--f-ui); color:var(--amber)}
+#status:empty{display:none}
+
+/* ---------- dialogs ---------- */
+dialog{
+  padding:0 12px 12px; width:min(580px, calc(100% - 32px)); max-height:calc(100% - 40px); overflow:auto;
+  color:var(--text); background:var(--case);
+  border:2px solid; border-color:var(--hi) var(--lo) var(--lo) var(--hi);
+  box-shadow:0 0 0 1px #000, 0 20px 60px rgba(0,0,0,.7);
+}
+dialog::backdrop{background:rgba(8,12,20,.65)}
+dialog .tbar{margin:0 -12px 12px; position:sticky; top:0; z-index:1}
+.sect{display:grid; gap:8px; padding:10px; margin-bottom:10px; background:var(--face); border:2px solid; border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+.sect h2{margin:0; font:11px var(--f-pix); letter-spacing:.12em; color:#dfe7ff}
+.sect p{margin:0; font-size:13px; color:var(--muted); max-width:62ch}
+.inrow{display:flex; gap:6px}
+.items{display:grid; gap:4px}
+.item{display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; padding:6px 8px; background:var(--case); border:1px solid var(--lo)}
+.item .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600}
+.item .meta{font:15px var(--f-lcd); color:var(--muted)}
+.item .meta.bad{color:var(--amber)}
+.row-btns{display:flex; flex-wrap:wrap; gap:6px}
+details{font-size:13px; color:var(--muted)}
+details summary{cursor:pointer; color:var(--text)}
+details ol{margin:8px 0 0; padding-left:20px; display:grid; gap:4px}
+code{font:15px var(--f-lcd); color:var(--lcd)}
+
+.drop-hint{position:fixed; inset:0; display:grid; place-items:center; background:rgba(8,14,10,.82); z-index:50; pointer-events:none}
+.drop-hint div{font:28px var(--f-lcd); color:var(--lcd); border:2px dashed var(--lcd); padding:30px 40px}
+
+@media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto} }
+</style>
+</head>
+<body>
+
+<main class="deck">
+
+  <!-- MAIN WINDOW -->
+  <section class="win" id="main" aria-label="Player">
+    <div class="tbar"><span class="grip"></span><span>DRIVEDECK</span><span class="grip"></span>
+      <button class="tbtn" id="openSources" type="button" title="Music sources">SOURCES</button></div>
+
+    <div class="display">
+      <div class="lcd clock" id="clock" title="Click time to switch elapsed/remaining. Click the analyzer to switch modes.">
+        <div class="row1">
+          <span class="state" id="stateIcon"></span>
+          <span id="time">0:00</span>
+        </div>
+        <canvas id="vis" width="76" height="22"></canvas>
+      </div>
+      <div class="info">
+        <div class="lcd" id="marquee" aria-live="off"></div>
+        <div class="chips">
+          <span class="lcd chip"><span id="kbps">---</span><b>KBPS</b></span>
+          <span class="lcd chip"><span id="srcLbl">---</span><b>SRC</b></span>
+          <span class="lcd chip"><span id="pos">0/0</span><b>TRK</b></span>
+        </div>
+      </div>
+    </div>
+
+    <input class="seek" id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+
+    <div class="transport">
+      <button class="btn tp" id="bPrev" type="button" title="Previous (Z)" aria-label="Previous"><svg viewBox="0 0 16 16"><path d="M2 2h2v12H2zM15 2v12L5 8z"/></svg></button>
+      <button class="btn tp" id="bPlay" type="button" title="Play (X)" aria-label="Play"><svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg></button>
+      <button class="btn tp" id="bPause" type="button" title="Pause (C)" aria-label="Pause"><svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+      <button class="btn tp" id="bStop" type="button" title="Stop (V)" aria-label="Stop"><svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/></svg></button>
+      <button class="btn tp" id="bNext" type="button" title="Next (B)" aria-label="Next"><svg viewBox="0 0 16 16"><path d="M12 2h2v12h-2zM1 2v12l10-6z"/></svg></button>
+      <button class="btn tp" id="bEject" type="button" title="Add music" aria-label="Add music"><svg viewBox="0 0 16 16"><path d="M8 2l6 7H2zM2 11h12v3H2z"/></svg></button>
+      <span class="spacer"></span>
+      <button class="btn" id="bShuf" type="button" aria-pressed="false">SHUF</button>
+      <button class="btn" id="bRep" type="button" aria-pressed="false">REP</button>
+    </div>
+
+    <div class="mix">
+      <label class="lbl" for="vol">Vol</label><input id="vol" type="range" min="0" max="100" value="80">
+      <label class="lbl" for="bal">Bal</label><input id="bal" type="range" min="-100" max="100" value="0">
+    </div>
+
+    <div class="toggles">
+      <button class="btn" id="tEq" type="button" aria-pressed="true">EQ</button>
+      <button class="btn" id="tPl" type="button" aria-pressed="true">PL</button>
+    </div>
+  </section>
+
+  <!-- EQUALIZER -->
+  <section class="win" id="eq" aria-label="Equalizer">
+    <div class="tbar"><span class="grip"></span><span>EQUALIZER</span><span class="grip"></span></div>
+    <div class="eqtop">
+      <button class="btn" id="eqOn" type="button" aria-pressed="true">ON</button>
+      <select class="field" id="preset" aria-label="Preset"></select>
+      <button class="btn" id="eqReset" type="button">FLAT</button>
+    </div>
+    <div class="bands" id="bands"></div>
+    <div class="db"><span>PREAMP</span><span>+12 / 0 / −12 dB</span></div>
+  </section>
+
+  <!-- PLAYLIST -->
+  <section class="win" id="pl" aria-label="Playlist">
+    <div class="tbar"><span class="grip"></span><span>PLAYLIST</span><span class="grip"></span></div>
+    <div class="pltop">
+      <input class="field" id="search" type="search" placeholder="Search playlist…" aria-label="Search playlist" autocomplete="off">
+    </div>
+    <div class="lcd list" id="list" tabindex="0" role="listbox" aria-label="Tracks"></div>
+    <div class="plfoot">
+      <button class="btn" id="pAdd" type="button">ADD</button>
+      <button class="btn" id="pRem" type="button">REM</button>
+      <button class="btn" id="pClr" type="button">CLR</button>
+      <button class="btn" id="pLists" type="button">LISTS</button>
+      <span class="sum" id="sum">0 tracks</span>
+    </div>
+    <div id="status" role="status"></div>
+  </section>
+</main>
+
+<!-- SOURCES DIALOG -->
+<dialog id="dlgSources" aria-label="Music sources">
+  <div class="tbar"><span class="grip"></span><span>SOURCES</span><span class="grip"></span>
+    <button class="tbtn" type="button" data-close>CLOSE</button></div>
+
+  <div class="sect">
+    <h2>GOOGLE DRIVE</h2>
+    <p>Paste your Google API key once, then add any folders shared as “Anyone with the link”. Subfolders are included.</p>
+    <label class="lbl" for="keyIn">API key</label>
+    <div class="inrow">
+      <input class="field" id="keyIn" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false">
+      <button class="btn" id="keyShow" type="button">SHOW</button>
+      <button class="btn" id="keySave" type="button">SAVE</button>
+    </div>
+    <label class="lbl" for="folderIn">Folder link</label>
+    <div class="inrow">
+      <input class="field" id="folderIn" type="url" placeholder="https://drive.google.com/drive/folders/…" autocomplete="off" spellcheck="false">
+      <button class="btn" id="folderAdd" type="button">ADD</button>
+    </div>
+    <div class="items" id="driveItems"></div>
+    <details>
+      <summary>How do I get an API key?</summary>
+      <ol>
+        <li>Open <code>console.cloud.google.com</code> and create a project.</li>
+        <li>Under APIs &amp; Services → Library, enable <b>Google Drive API</b>.</li>
+        <li>Under Credentials, create an <b>API key</b>. Restrict it to the Google Drive API and to this site’s address.</li>
+        <li>In Drive, share your music folder as <b>Anyone with the link · Viewer</b>, then paste its link above.</li>
+      </ol>
+    </details>
+  </div>
+
+  <div class="sect">
+    <h2>THIS DEVICE</h2>
+    <p>Add songs or whole folders from this device, or drag them onto the player. Local files aren’t uploaded anywhere.</p>
+    <div class="row-btns">
+      <button class="btn" id="addFiles" type="button">ADD FILES</button>
+      <button class="btn" id="addFolder" type="button">ADD FOLDER</button>
+      <button class="btn" id="remember" type="button" hidden>REMEMBER A FOLDER</button>
+    </div>
+    <p id="rememberNote" hidden>Remembered folders come back the next time you open DriveDeck. You’ll be asked to allow access again with one click.</p>
+    <p id="noRememberNote" hidden>This browser can’t remember folders between visits, so local songs need to be added again each time. Chrome and Edge on a computer can remember them.</p>
+    <div class="items" id="localItems"></div>
+    <input type="file" id="fileIn" accept="audio/*,.mp3,.m4a,.aac,.ogg,.oga,.opus,.flac,.wav,.weba,.webm" multiple hidden>
+    <input type="file" id="dirIn" webkitdirectory multiple hidden>
+  </div>
+</dialog>
+
+<!-- SAVED PLAYLISTS DIALOG -->
+<dialog id="dlgLists" aria-label="Saved playlists">
+  <div class="tbar"><span class="grip"></span><span>SAVED PLAYLISTS</span><span class="grip"></span>
+    <button class="tbtn" type="button" data-close>CLOSE</button></div>
+  <div class="sect">
+    <h2>SAVE CURRENT PLAYLIST</h2>
+    <form class="inrow" id="saveForm">
+      <input class="field" id="listName" placeholder="Playlist name" maxlength="60" autocomplete="off" required>
+      <button class="btn" type="submit">SAVE</button>
+    </form>
+  </div>
+  <div class="sect">
+    <h2>YOUR PLAYLISTS</h2>
+    <div class="items" id="savedItems"></div>
+  </div>
+</dialog>
+
+<div class="drop-hint" id="dropHint" hidden><div>DROP MUSIC TO ADD</div></div>
+
+<script>
+"use strict";
+/* ============ helpers ============ */
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem('dd.' + k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('dd.' + k, JSON.stringify(v)); }catch(e){} }
+};
+const AUDIO_RE = /\.(mp3|m4a|aac|ogg|oga|opus|flac|wav|weba|webm)$/i;
+const isAudio = (name, mime) => AUDIO_RE.test(name) || (!!mime && mime.startsWith('audio/'));
+const stripExt = n => n.replace(/\.[^.]+$/, '');
+const coll = new Intl.Collator(undefined, {numeric:true, sensitivity:'base'});
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function fmt(s){
+  if(!isFinite(s) || s < 0) return '-:--';
+  s = Math.floor(s);
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return (h ? h + ':' + String(m).padStart(2,'0') : m) + ':' + String(x).padStart(2,'0');
+}
+let statusTimer;
+function status(msg, sticky){
+  const el = $('#status'); el.textContent = msg || '';
+  clearTimeout(statusTimer);
+  if(msg && !sticky) statusTimer = setTimeout(() => { el.textContent = ''; }, 7000);
+}
+function twoStep(btn, label, action){
+  if(btn.dataset.armed){ delete btn.dataset.armed; btn.textContent = btn.dataset.orig; btn.classList.remove('warn'); action(); return; }
+  btn.dataset.orig = btn.textContent; btn.dataset.armed = '1'; btn.textContent = label; btn.classList.add('warn');
+  setTimeout(() => { if(btn.dataset.armed){ delete btn.dataset.armed; btn.textContent = btn.dataset.orig; btn.classList.remove('warn'); } }, 3000);
+}
+
+/* ============ state ============ */
+let apiKey = LS.get('key', '');
+let driveFolders = LS.get('folders', []);        // {id, name, count}
+let playlist = LS.get('playlist', []);           // {k, t:'d'|'l', id?, f, n, s, d?}
+let savedLists = LS.get('saved', []);            // {name, at, items}
+const localFiles = new Map();                    // key -> File
+let localDirs = [];                              // {id, name, handle, state, count}
+let currentKey = LS.get('current', null), selectedKey = null;
+let blobUrl = null, stopped = true, errCount = 0, history = [];
+const prefs = Object.assign({
+  vol:80, bal:0, shuffle:false, repeat:'off', eqOn:true, eq:Array(10).fill(0), pre:0,
+  preset:'Flat', showEq:true, showPl:true, remain:false, vis:'spec'
+}, LS.get('prefs', {}));
+const savePrefs = () => LS.set('prefs', prefs);
+let saveT;
+function savePlaylist(){
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    LS.set('playlist', playlist.map(({k,t,id,f,n,s,d}) => ({k,t,id,f,n,s,d})));
+    LS.set('current', currentKey);
+  }, 250);
+}
+const avail = t => t.t === 'd' ? !!apiKey : localFiles.has(t.k);
+const findIdx = k => playlist.findIndex(t => t.k === k);
+const curTrack = () => playlist.find(t => t.k === currentKey) || null;
+
+/* ============ audio graph ============ */
+const audio = new Audio();
+audio.crossOrigin = 'anonymous';
+audio.preload = 'auto';
+const FREQS = [60,170,310,600,1000,3000,6000,12000,14000,16000];
+const FLABEL = ['60','170','310','600','1K','3K','6K','12K','14K','16K'];
+const PRESETS = {
+  'Flat':        [0,0,0,0,0,0,0,0,0,0],
+  'Rock':        [5,3,-2,-4,-1,2,5,6,6,6],
+  'Pop':         [-1,2,4,5,3,0,-1,-1,-1,-1],
+  'Dance':       [6,5,2,0,0,-3,-4,-4,0,0],
+  'Classical':   [0,0,0,0,0,0,-4,-4,-4,-6],
+  'Jazz':        [3,2,1,2,-1,-1,0,1,2,3],
+  'Vocal':       [-2,-3,-3,1,4,4,3,1,0,-2],
+  'Bass boost':  [7,6,4,2,0,0,0,0,0,0],
+  'Treble boost':[0,0,0,0,0,2,4,6,7,7],
+  'Live':        [-3,0,2,3,3,3,2,1,1,1],
+  'Headphones':  [3,6,3,-2,-1,1,3,6,8,9]
+};
+let ctx, srcNode, preNode, bandNodes = [], panNode, volNode, analyser;
+function ensureCtx(){
+  if(ctx){ if(ctx.state === 'suspended') ctx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return;
+  ctx = new AC();
+  srcNode = ctx.createMediaElementSource(audio);
+  preNode = ctx.createGain();
+  bandNodes = FREQS.map((f, i) => {
+    const b = ctx.createBiquadFilter();
+    b.type = i === 0 ? 'lowshelf' : i === 9 ? 'highshelf' : 'peaking';
+    b.frequency.value = f; b.Q.value = 1.4; return b;
+  });
+  panNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  volNode = ctx.createGain();
+  analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.72;
+  let n = srcNode;
+  for(const x of [preNode, ...bandNodes, panNode, volNode]){ if(x){ n.connect(x); n = x; } }
+  n.connect(analyser); analyser.connect(ctx.destination);
+  applyAudio();
+}
+function applyAudio(){
+  if(!ctx){ audio.volume = prefs.vol/100; return; }
+  audio.volume = 1;
+  volNode.gain.value = Math.pow(prefs.vol/100, 1.6);
+  if(panNode) panNode.pan.value = prefs.bal/100;
+  preNode.gain.value = prefs.eqOn ? Math.pow(10, prefs.pre/20) : 1;
+  bandNodes.forEach((b, i) => { b.gain.value = prefs.eqOn ? prefs.eq[i] : 0; });
+}
+
+/* ============ playback ============ */
+function driveUrl(t){
+  return 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(t.id) +
+         '?alt=media&supportsAllDrives=true&key=' + encodeURIComponent(apiKey);
+}
+function play(k, fromHistory){
+  const t = playlist.find(x => x.k === k);
+  if(!t) return;
+  if(!avail(t)){
+    status(t.t === 'd'
+      ? 'Add your Google API key in Sources to play Drive tracks.'
+      : '“' + t.n + '” is on this device, but its folder isn’t connected. Add or reconnect it in Sources.');
+    openSources(); return;
+  }
+  ensureCtx();
+  if(blobUrl){ URL.revokeObjectURL(blobUrl); blobUrl = null; }
+  if(!fromHistory && currentKey && currentKey !== k) history.push(currentKey);
+  if(history.length > 200) history.shift();
+  currentKey = k; stopped = false;
+  audio.src = t.t === 'l' ? (blobUrl = URL.createObjectURL(localFiles.get(k))) : driveUrl(t);
+  audio.play().catch(e => { if(e.name !== 'AbortError') status('Playback was blocked: ' + e.message); });
+  marqueeOff = 0;
+  setMediaMeta(t); renderList(true); updateInfo(); savePlaylist();
+}
+function playableIdx(){ return playlist.map((t,i) => avail(t) ? i : -1).filter(i => i >= 0); }
+function next(auto){
+  if(!playlist.length) return;
+  if(auto && prefs.repeat === 'one' && curTrack()){ play(currentKey, true); return; }
+  const ok = playableIdx(); if(!ok.length){ status('No playable tracks. Open Sources to connect your music.'); return; }
+  const i = findIdx(currentKey);
+  if(prefs.shuffle){
+    const pool = ok.filter(x => x !== i);
+    play(playlist[(pool.length ? pool : ok)[Math.floor(Math.random() * (pool.length || ok.length))]].k);
+    return;
+  }
+  const after = ok.find(x => x > i);
+  if(after !== undefined) play(playlist[after].k);
+  else if(prefs.repeat === 'all' || !auto) play(playlist[ok[0]].k);
+  else doStop();
+}
+function prev(){
+  if(audio.currentTime > 3 && !stopped){ audio.currentTime = 0; return; }
+  if(prefs.shuffle && history.length){ play(history.pop(), true); return; }
+  const ok = playableIdx(); if(!ok.length) return;
+  const i = findIdx(currentKey);
+  const before = [...ok].reverse().find(x => x < i);
+  play(playlist[before !== undefined ? before : ok[ok.length - 1]].k);
+}
+function doPlay(){
+  if(audio.src && !stopped && audio.paused){ ensureCtx(); audio.play().catch(()=>{}); return; }
+  if(audio.src && !stopped) { audio.currentTime = 0; return; }
+  const k = selectedKey || currentKey;
+  if(k && findIdx(k) >= 0) { play(k); return; }
+  const ok = playableIdx();
+  if(ok.length) play(playlist[ok[0]].k);
+  else openSources();
+}
+function doPause(){
+  if(stopped || !audio.src) return;
+  if(audio.paused){ ensureCtx(); audio.play().catch(()=>{}); } else audio.pause();
+}
+function doStop(){
+  audio.pause();
+  if(audio.src) try{ audio.currentTime = 0; }catch(e){}
+  stopped = true; updateInfo(); renderState();
+}
+audio.addEventListener('ended', () => next(true));
+audio.addEventListener('playing', () => { errCount = 0; renderState(); });
+audio.addEventListener('pause', renderState);
+audio.addEventListener('loadedmetadata', () => {
+  const t = curTrack();
+  if(t && isFinite(audio.duration)){ t.d = audio.duration; savePlaylist(); renderList(); }
+  updateInfo();
+});
+audio.addEventListener('error', () => {
+  if(!audio.src || stopped) return;
+  const t = curTrack();
+  const name = t ? '“' + t.n + '”' : 'this track';
+  status(t && t.t === 'd'
+    ? 'Couldn’t load ' + name + ' from Drive. Check the folder is shared as “Anyone with the link” and the API key is allowed on this site.'
+    : 'Couldn’t play ' + name + '. This browser may not support its format.');
+  errCount++;
+  if(errCount < 4 && playlist.length > 1) setTimeout(() => next(true), 900);
+  else doStop();
+});
+
+/* Media Session: lock screen & headset controls */
+function setMediaMeta(t){
+  if(!('mediaSession' in navigator)) return;
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: t.n, artist: t.t === 'd' ? 'Google Drive' : 'This device', album: 'DriveDeck'
+    });
+  }catch(e){}
+}
+if('mediaSession' in navigator){
+  const ms = navigator.mediaSession, set = (a, f) => { try{ ms.setActionHandler(a, f); }catch(e){} };
+  set('play', doPlay); set('pause', () => audio.pause()); set('stop', doStop);
+  set('previoustrack', prev); set('nexttrack', () => next(false));
+  set('seekto', d => { if(isFinite(d.seekTime)) audio.currentTime = d.seekTime; });
+}
+
+/* ============ main window rendering ============ */
+const ICONS = {
+  play:'<svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z"/></svg>',
+  pause:'<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>',
+  stop:'<svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/></svg>'
+};
+function playState(){ return stopped || !audio.src ? 'stop' : audio.paused ? 'pause' : 'play'; }
+let lastState;
+function renderState(){
+  const s = playState();
+  if(s !== lastState){ $('#stateIcon').innerHTML = ICONS[s]; lastState = s; }
+}
+function updateInfo(){
+  const t = curTrack();
+  const i = findIdx(currentKey);
+  $('#pos').textContent = (i >= 0 ? i + 1 : 0) + '/' + playlist.length;
+  $('#srcLbl').textContent = t ? (t.t === 'd' ? 'DRV' : 'LOC') : '---';
+  const d = t && (t.d || audio.duration);
+  $('#kbps').textContent = t && t.s && isFinite(d) && d > 0 ? Math.round(t.s * 8 / d / 1000) : '---';
+  renderState();
+}
+let marqueeOff = 0;
+function marqueeText(){
+  const t = curTrack();
+  if(!t) return playlist.length
+    ? '*** DRIVEDECK *** ' + playlist.length + ' TRACKS READY *** PRESS PLAY '
+    : '*** DRIVEDECK *** OPEN SOURCES TO ADD MUSIC ';
+  return (findIdx(currentKey) + 1) + '. ' + t.n + ' (' + fmt(t.d || audio.duration) + ')  ***  ';
+}
+setInterval(() => {
+  let s = marqueeText();
+  while(s.length < 70) s += s;
+  const o = marqueeOff % s.length;
+  $('#marquee').textContent = s.slice(o) + s.slice(0, o);
+  marqueeOff++;
+}, 220);
+
+/* time + seek + visualizer loop */
+const seek = $('#seek'); let seeking = false;
+seek.addEventListener('pointerdown', () => { seeking = true; });
+seek.addEventListener('pointerup', () => setTimeout(() => { seeking = false; }, 50));
+seek.addEventListener('pointercancel', () => { seeking = false; });
+seek.addEventListener('input', () => {
+  seeking = true;
+  if(isFinite(audio.duration)) $('#time').textContent = fmt(seek.value/1000 * audio.duration);
+});
+seek.addEventListener('change', () => {
+  if(isFinite(audio.duration) && !stopped) audio.currentTime = seek.value/1000 * audio.duration;
+  seeking = false;
+});
+$('#time').addEventListener('click', e => { e.stopPropagation(); prefs.remain = !prefs.remain; savePrefs(); });
+$('#vis').addEventListener('click', e => { e.stopPropagation(); prefs.vis = prefs.vis === 'spec' ? 'osc' : prefs.vis === 'osc' ? 'off' : 'spec'; savePrefs(); });
+
+const cv = $('#vis'), g = cv.getContext('2d'), W = 76, H = 22;
+const css = getComputedStyle(document.documentElement);
+const C = { bg: css.getPropertyValue('--lcd-bg').trim(), dim: css.getPropertyValue('--lcd-dim').trim(),
+            on: css.getPropertyValue('--lcd').trim(), amber: css.getPropertyValue('--amber').trim(), hot: css.getPropertyValue('--hot').trim() };
+const BARS = 19, peaks = new Float32Array(BARS), peakHold = new Float32Array(BARS);
+let fd, td, lastTime = '';
+function frame(){
+  requestAnimationFrame(frame);
+  // time
+  if(!seeking){
+    let txt;
+    if(stopped || !audio.src) txt = '0:00';
+    else if(prefs.remain && isFinite(audio.duration)) txt = '-' + fmt(audio.duration - audio.currentTime);
+    else txt = fmt(audio.currentTime);
+    if(txt !== lastTime){ $('#time').textContent = txt; lastTime = txt; }
+    const v = isFinite(audio.duration) && audio.duration > 0 && !stopped ? Math.round(audio.currentTime / audio.duration * 1000) : 0;
+    if(+seek.value !== v) seek.value = v;
+  }
+  // visualizer
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  const live = analyser && playState() === 'play';
+  if(prefs.vis === 'spec'){
+    g.fillStyle = C.dim;
+    for(let b = 0; b < BARS; b++) for(let y = 1; y < H; y += 2) g.fillRect(b*4, y, 3, 1);
+    if(live){
+      fd = fd || new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(fd);
+      const maxBin = Math.min(fd.length - 1, Math.round(16000 / (ctx.sampleRate / analyser.fftSize)));
+      for(let b = 0; b < BARS; b++){
+        const lo = Math.floor(2 * Math.pow(maxBin/2, b/BARS)), hi = Math.max(lo + 1, Math.floor(2 * Math.pow(maxBin/2, (b+1)/BARS)));
+        let m = 0; for(let i = lo; i < hi; i++) if(fd[i] > m) m = fd[i];
+        const h = Math.round(m / 255 * H);
+        for(let y = 0; y < h; y++){
+          const row = H - 1 - y;
+          g.fillStyle = y > H*0.8 ? C.hot : y > H*0.55 ? C.amber : C.on;
+          g.fillRect(b*4, row, 3, 1);
+        }
+        if(h >= peaks[b]){ peaks[b] = h; peakHold[b] = 18; }
+        else if(peakHold[b] > 0) peakHold[b]--;
+        else peaks[b] = Math.max(0, peaks[b] - 0.35);
+        if(peaks[b] > 0.5){ g.fillStyle = '#d9dee7'; g.fillRect(b*4, H - 1 - Math.round(peaks[b]), 3, 1); }
+      }
+    } else peaks.fill(0);
+  } else if(prefs.vis === 'osc'){
+    g.fillStyle = C.dim; g.fillRect(0, H >> 1, W, 1);
+    if(live){
+      td = td || new Uint8Array(analyser.fftSize);
+      analyser.getByteTimeDomainData(td);
+      g.fillStyle = C.on;
+      for(let x = 0; x < W; x++){
+        const y = Math.round(td[Math.floor(x * td.length / W / 2)] / 255 * (H - 1));
+        g.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+}
+requestAnimationFrame(frame);
+
+/* ============ playlist rendering ============ */
+const listEl = $('#list');
+let filter = '';
+function renderList(scrollToCur){
+  const q = filter.trim().toLowerCase();
+  if(!playlist.length){
+    listEl.innerHTML = '<div class="empty"><b>No tracks yet.</b><br>Press <b>ADD</b> to connect a Google Drive folder or add music from this device. You can also drag files or folders onto the player.</div>';
+  } else {
+    let html = '';
+    playlist.forEach((t, i) => {
+      if(q && !t.n.toLowerCase().includes(q)) return;
+      const cls = 'trk' + (t.k === currentKey ? ' cur' : '') + (t.k === selectedKey ? ' sel' : '') + (avail(t) ? '' : ' na');
+      html += '<div class="' + cls + '" role="option" aria-selected="' + (t.k === selectedKey) + '" data-k="' + esc(t.k) + '" title="' +
+        esc(t.n) + (avail(t) ? '' : ' (not connected)') + '"><span class="n">' + (i+1) + '.</span><span class="t">' + esc(t.n) +
+        '</span><span class="s">' + (t.t === 'd' ? 'DRV' : 'LOC') + '</span><span class="d">' + (t.d ? fmt(t.d) : '') + '</span></div>';
+    });
+    listEl.innerHTML = html || '<div class="empty">No tracks match “' + esc(filter) + '”.</div>';
+  }
+  const total = playlist.reduce((a, t) => a + (t.d || 0), 0);
+  const unknown = playlist.some(t => !t.d);
+  const na = playlist.filter(t => !avail(t)).length;
+  $('#sum').textContent = playlist.length + ' track' + (playlist.length === 1 ? '' : 's') +
+    (total ? ' · ' + fmt(total) + (unknown ? '+' : '') : '') + (na ? ' · ' + na + ' offline' : '');
+  if(scrollToCur){
+    const el = listEl.querySelector('.cur');
+    if(el) el.scrollIntoView({block:'nearest'});
+  }
+  updateInfo();
+}
+const coarse = matchMedia('(pointer:coarse)');
+listEl.addEventListener('click', e => {
+  const row = e.target.closest('.trk'); if(!row) return;
+  selectedKey = row.dataset.k;
+  if(coarse.matches) play(selectedKey); else renderList();
+});
+listEl.addEventListener('dblclick', e => {
+  const row = e.target.closest('.trk'); if(row) play(row.dataset.k);
+});
+listEl.addEventListener('keydown', e => {
+  const vis = [...listEl.querySelectorAll('.trk')].map(r => r.dataset.k);
+  if(!vis.length) return;
+  let i = vis.indexOf(selectedKey);
+  if(e.key === 'ArrowDown'){ i = Math.min(vis.length - 1, i + 1); }
+  else if(e.key === 'ArrowUp'){ i = Math.max(0, i - 1); }
+  else if(e.key === 'Enter' && selectedKey){ play(selectedKey); e.preventDefault(); return; }
+  else if(e.key === 'Delete' || e.key === 'Backspace'){ removeSelected(); e.preventDefault(); return; }
+  else return;
+  e.preventDefault(); e.stopPropagation();
+  selectedKey = vis[i]; renderList();
+  const el = listEl.querySelector('.sel'); if(el) el.scrollIntoView({block:'nearest'});
+});
+$('#search').addEventListener('input', e => { filter = e.target.value; renderList(); });
+
+function addTracks(items){
+  const have = new Set(playlist.map(t => t.k));
+  let added = 0;
+  for(const t of items){ if(!have.has(t.k)){ playlist.push(t); have.add(t.k); added++; } }
+  savePlaylist(); renderList();
+  return added;
+}
+function removeSelected(){
+  if(!selectedKey) { status('Select a track first.'); return; }
+  const i = findIdx(selectedKey); if(i < 0) return;
+  if(selectedKey === currentKey){ doStop(); audio.removeAttribute('src'); audio.load(); currentKey = null; }
+  playlist.splice(i, 1);
+  selectedKey = playlist[i] ? playlist[i].k : playlist[i-1] ? playlist[i-1].k : null;
+  savePlaylist(); renderList();
+}
+$('#pRem').addEventListener('click', removeSelected);
+$('#pClr').addEventListener('click', e => twoStep(e.currentTarget, 'SURE?', () => {
+  doStop(); audio.removeAttribute('src'); audio.load();
+  playlist = []; currentKey = selectedKey = null; history = [];
+  savePlaylist(); renderList(); status('Playlist cleared. Your sources are still connected. Use RESCAN in Sources to load them again.');
+}));
+$('#pAdd').addEventListener('click', openSources);
+$('#bEject').addEventListener('click', openSources);
+$('#openSources').addEventListener('click', openSources);
+
+/* ============ Google Drive ============ */
+function parseFolderId(s){
+  s = s.trim();
+  let m = s.match(/\/folders\/([\w-]{10,})/) || s.match(/[?&]id=([\w-]{10,})/);
+  if(m) return m[1];
+  if(/^[\w-]{15,}$/.test(s)) return s;
+  return null;
+}
+function driveErr(status, j){
+  const m = (j && j.error && j.error.message) || '';
+  if(status === 404) return 'Folder not found. Check the link, and that the folder is shared as “Anyone with the link”.';
+  if(status === 400 && /api key/i.test(m)) return 'Google says the API key isn’t valid. Check it and save it again.';
+  if(status === 403){
+    if(/has not been used|is disabled|not been enabled/i.test(m)) return 'The Google Drive API isn’t enabled in the Google Cloud project for this key.';
+    if(/referer|referrer|blocked/i.test(m)) return 'This API key doesn’t allow this website. Add this site’s address to the key’s website restrictions.';
+    return 'Google refused the request: ' + m;
+  }
+  return m || 'Google Drive request failed (' + status + ').';
+}
+async function gapi(path, params){
+  const u = new URL('https://www.googleapis.com/drive/v3/' + path);
+  for(const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+  u.searchParams.set('key', apiKey);
+  let r;
+  try{ r = await fetch(u); }catch(e){ throw new Error('Couldn’t reach Google Drive. Check your connection.'); }
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(driveErr(r.status, j));
+  return j;
+}
+async function scanDrive(folder, onProgress){
+  const meta = await gapi('files/' + encodeURIComponent(folder.id), {fields:'id,name,mimeType', supportsAllDrives:'true'});
+  if(meta.mimeType !== 'application/vnd.google-apps.folder') throw new Error('That link points to a file, not a folder.');
+  folder.name = meta.name;
+  const out = [], queue = [{id: folder.id, path: ''}];
+  while(queue.length){
+    const {id, path} = queue.shift();
+    let pageToken = '';
+    do{
+      const p = {
+        q: "'" + id + "' in parents and trashed=false",
+        fields: 'nextPageToken,files(id,name,mimeType,size)',
+        pageSize: '1000', supportsAllDrives: 'true', includeItemsFromAllDrives: 'true', orderBy: 'name'
+      };
+      if(pageToken) p.pageToken = pageToken;
+      const j = await gapi('files', p);
+      for(const f of j.files || []){
+        if(f.mimeType === 'application/vnd.google-apps.folder') queue.push({id: f.id, path: path + f.name + '/'});
+        else if(isAudio(f.name, f.mimeType)) out.push({k:'d:' + f.id, t:'d', id:f.id, f:folder.id, n:stripExt(f.name), s:+f.size || 0, p:path + f.name});
+      }
+      pageToken = j.nextPageToken || '';
+      onProgress && onProgress(out.length);
+    }while(pageToken);
+  }
+  out.sort((a, b) => coll.compare(a.p, b.p));
+  return out;
+}
+async function syncDriveFolder(folder){
+  folder.busy = true; renderSources();
+  try{
+    const tracks = await scanDrive(folder, n => { folder.progress = n; renderSources(); });
+    const keys = new Set(tracks.map(t => t.k));
+    const before = playlist.length;
+    playlist = playlist.filter(t => !(t.t === 'd' && t.f === folder.id && !keys.has(t.k)));
+    const removed = before - playlist.length;
+    const added = addTracks(tracks);
+    folder.count = tracks.length; folder.err = '';
+    status(folder.name + ': ' + tracks.length + ' tracks (' + added + ' added' + (removed ? ', ' + removed + ' removed' : '') + ').');
+  }catch(e){
+    folder.err = e.message; status(e.message, true);
+  }finally{
+    folder.busy = false; folder.progress = 0;
+    LS.set('folders', driveFolders.map(({id, name, count}) => ({id, name, count})));
+    renderSources(); renderList();
+  }
+}
+$('#keyShow').addEventListener('click', e => {
+  const i = $('#keyIn'); i.type = i.type === 'password' ? 'text' : 'password';
+  e.currentTarget.textContent = i.type === 'password' ? 'SHOW' : 'HIDE';
+});
+$('#keySave').addEventListener('click', () => {
+  apiKey = $('#keyIn').value.trim(); LS.set('key', apiKey);
+  status(apiKey ? 'API key saved on this device.' : 'API key removed.');
+  renderList(); renderSources();
+});
+$('#folderAdd').addEventListener('click', async () => {
+  const id = parseFolderId($('#folderIn').value);
+  if(!apiKey){ status('Save your API key first.', true); $('#keyIn').focus(); return; }
+  if(!id){ status('That doesn’t look like a Google Drive folder link.', true); return; }
+  if(driveFolders.some(f => f.id === id)){ status('That folder is already added. Use RESCAN to refresh it.'); return; }
+  const folder = {id, name:'Loading…', count:0};
+  driveFolders.push(folder); $('#folderIn').value = '';
+  await syncDriveFolder(folder);
+  if(folder.err && !folder.count){ driveFolders = driveFolders.filter(f => f !== folder); LS.set('folders', driveFolders.map(({id, name, count}) => ({id, name, count}))); renderSources(); }
+});
+$('#folderIn').addEventListener('keydown', e => { if(e.key === 'Enter') $('#folderAdd').click(); });
+
+/* ============ local files ============ */
+function addLocal(entries, label){
+  const items = [];
+  for(const {file, key, path} of entries){
+    if(!isAudio(file.name, file.type)) continue;
+    localFiles.set(key, file);
+    items.push({k:key, t:'l', f:label, n:stripExt(file.name), s:file.size, p:path});
+  }
+  items.sort((a, b) => coll.compare(a.p, b.p));
+  const added = addTracks(items);
+  renderList();
+  return {found: items.length, added};
+}
+const looseKey = f => 'l:' + f.name + ':' + f.size;
+$('#addFiles').addEventListener('click', () => $('#fileIn').click());
+$('#addFolder').addEventListener('click', () => $('#dirIn').click());
+$('#fileIn').addEventListener('change', e => {
+  const r = addLocal([...e.target.files].map(f => ({file:f, key:looseKey(f), path:f.name})), 'Files');
+  status(r.found ? r.added + ' track' + (r.added === 1 ? '' : 's') + ' added.' : 'No audio files found in that selection.');
+  e.target.value = '';
+});
+$('#dirIn').addEventListener('change', e => {
+  const files = [...e.target.files];
+  const root = files[0] ? files[0].webkitRelativePath.split('/')[0] : 'Folder';
+  const r = addLocal(files.map(f => ({file:f, key:'l:' + f.webkitRelativePath, path:f.webkitRelativePath})), root);
+  status(r.found ? root + ': ' + r.found + ' tracks found, ' + r.added + ' added.' : 'No audio files found in that folder.');
+  e.target.value = '';
+});
+
+/* drag & drop */
+let dragDepth = 0;
+const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+window.addEventListener('dragenter', e => { if(!hasFiles(e)) return; e.preventDefault(); dragDepth++; $('#dropHint').hidden = false; });
+window.addEventListener('dragover', e => { if(hasFiles(e)) e.preventDefault(); });
+window.addEventListener('dragleave', e => { if(!hasFiles(e)) return; if(--dragDepth <= 0){ dragDepth = 0; $('#dropHint').hidden = true; } });
+window.addEventListener('drop', async e => {
+  if(!hasFiles(e)) return;
+  e.preventDefault(); dragDepth = 0; $('#dropHint').hidden = true;
+  const entries = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  const loose = [], dirs = [];
+  if(!entries.length){ for(const f of e.dataTransfer.files) loose.push({file:f, key:looseKey(f), path:f.name}); }
+  status('Reading dropped files…', true);
+  for(const en of entries){
+    if(en.isFile){ const f = await new Promise((res, rej) => en.file(res, rej)); loose.push({file:f, key:looseKey(f), path:f.name}); }
+    else { const out = []; await readEntry(en, out); dirs.push({name:en.name, out}); }
+  }
+  let found = 0, added = 0;
+  if(loose.length){ const r = addLocal(loose, 'Files'); found += r.found; added += r.added; }
+  for(const d of dirs){ const r = addLocal(d.out.map(x => ({file:x.file, key:'l:' + x.path, path:x.path})), d.name); found += r.found; added += r.added; }
+  status(found ? found + ' tracks found, ' + added + ' added.' : 'No audio files found in what you dropped.');
+});
+async function readEntry(entry, out){
+  if(entry.isFile){
+    if(!AUDIO_RE.test(entry.name)) return;
+    const file = await new Promise((res, rej) => entry.file(res, rej));
+    out.push({file, path: entry.fullPath.replace(/^\//, '')});
+  } else if(entry.isDirectory){
+    const r = entry.createReader(); let batch;
+    do{ batch = await new Promise((res, rej) => r.readEntries(res, rej)); for(const e of batch) await readEntry(e, out); }while(batch.length);
+  }
+}
+
+/* remembered folders (File System Access API, Chrome/Edge desktop) */
+const canRemember = 'showDirectoryPicker' in window && 'indexedDB' in window;
+const idb = (() => {
+  let p;
+  const open = () => p || (p = new Promise((res, rej) => {
+    const r = indexedDB.open('drivedeck', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('dirs', {keyPath:'id'});
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const tx = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('dirs', mode), q = fn(t.objectStore('dirs'));
+      t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error);
+    });
+  };
+  return { all: () => tx('readonly', s => s.getAll()), put: v => tx('readwrite', s => s.put(v)), del: id => tx('readwrite', s => s.delete(id)) };
+})();
+async function walk(dir, prefix, out){
+  for await (const h of dir.values()){
+    if(h.kind === 'file'){ if(AUDIO_RE.test(h.name)) out.push({file: await h.getFile(), path: prefix + h.name}); }
+    else await walk(h, prefix + h.name + '/', out);
+  }
+}
+async function scanDir(rec, ask){
+  try{
+    let perm = await rec.handle.queryPermission({mode:'read'});
+    if(perm !== 'granted' && ask) perm = await rec.handle.requestPermission({mode:'read'});
+    if(perm !== 'granted'){ rec.state = 'needs'; renderSources(); return; }
+    rec.state = 'scanning'; renderSources();
+    const out = []; await walk(rec.handle, rec.handle.name + '/', out);
+    const r = addLocal(out.map(x => ({file:x.file, key:'l:' + x.path, path:x.path})), rec.name);
+    rec.count = r.found; rec.state = 'ready';
+    if(ask) status(rec.name + ': ' + r.found + ' tracks found, ' + r.added + ' added.');
+  }catch(e){
+    rec.state = 'needs'; status('Couldn’t read ' + rec.name + ': ' + e.message, true);
+  }
+  renderSources(); renderList();
+}
+$('#remember').addEventListener('click', async () => {
+  let handle;
+  try{ handle = await window.showDirectoryPicker({id:'music', mode:'read'}); }catch(e){ return; }
+  if(localDirs.some(d => d.name === handle.name)){ status('A folder named “' + handle.name + '” is already remembered.'); }
+  const rec = {id: String(Date.now()), name: handle.name, handle, state:'scanning', count:0};
+  localDirs.push(rec);
+  try{ await idb.put({id:rec.id, name:rec.name, handle}); }catch(e){}
+  await scanDir(rec, true);
+});
+async function loadDirs(){
+  if(!canRemember) return;
+  try{
+    const rows = await idb.all();
+    localDirs = (rows || []).map(r => ({...r, state:'needs', count:0}));
+    for(const d of localDirs) await scanDir(d, false);
+  }catch(e){}
+  renderSources();
+}
+
+/* ============ sources dialog ============ */
+const dlgS = $('#dlgSources'), dlgL = $('#dlgLists');
+function openSources(){ $('#keyIn').value = apiKey; renderSources(); if(!dlgS.open) dlgS.showModal(); }
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+[dlgS, dlgL].forEach(d => d.addEventListener('click', e => { if(e.target === d) d.close(); }));
+function renderSources(){
+  $('#remember').hidden = !canRemember;
+  $('#rememberNote').hidden = !canRemember;
+  $('#noRememberNote').hidden = canRemember;
+  const di = $('#driveItems');
+  di.innerHTML = driveFolders.length ? driveFolders.map(f =>
+    '<div class="item" data-id="' + esc(f.id) + '"><span class="nm">' + esc(f.name) + '</span>' +
+    '<span class="meta' + (f.err ? ' bad' : '') + '">' + (f.busy ? 'scanning… ' + (f.progress || 0) : f.err ? 'error' : (f.count || 0) + ' tracks') + '</span>' +
+    '<span class="row-btns"><button class="btn" type="button" data-act="rescan"' + (f.busy ? ' disabled' : '') + '>RESCAN</button>' +
+    '<button class="btn" type="button" data-act="remove"' + (f.busy ? ' disabled' : '') + '>REMOVE</button></span></div>'
+  ).join('') : '<p>No Drive folders yet.</p>';
+  const li = $('#localItems');
+  const looseCount = playlist.filter(t => t.t === 'l' && !localDirs.some(d => d.name === t.f)).length;
+  li.innerHTML = localDirs.map(d =>
+    '<div class="item" data-id="' + esc(d.id) + '"><span class="nm">' + esc(d.name) + '</span>' +
+    '<span class="meta' + (d.state === 'needs' ? ' bad' : '') + '">' + (d.state === 'scanning' ? 'scanning…' : d.state === 'needs' ? 'needs access' : d.count + ' tracks') + '</span>' +
+    '<span class="row-btns"><button class="btn" type="button" data-act="' + (d.state === 'needs' ? 'reconnect' : 'rescanl') + '">' + (d.state === 'needs' ? 'RECONNECT' : 'RESCAN') + '</button>' +
+    '<button class="btn" type="button" data-act="forget">FORGET</button></span></div>'
+  ).join('') + (looseCount ? '<p>' + looseCount + ' other local track' + (looseCount === 1 ? '' : 's') + ' in the playlist.' +
+    (playlist.some(t => t.t === 'l' && !avail(t)) ? ' Tracks marked offline play again once you add their files or folder.' : '') + '</p>' : '');
+}
+$('#driveItems').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  const f = driveFolders.find(x => x.id === b.closest('.item').dataset.id); if(!f) return;
+  if(b.dataset.act === 'rescan'){ if(!apiKey){ status('Save your API key first.', true); return; } syncDriveFolder(f); }
+  if(b.dataset.act === 'remove') twoStep(b, 'SURE?', () => {
+    driveFolders = driveFolders.filter(x => x !== f);
+    LS.set('folders', driveFolders.map(({id, name, count}) => ({id, name, count})));
+    if(curTrack() && curTrack().f === f.id){ doStop(); currentKey = null; }
+    playlist = playlist.filter(t => !(t.t === 'd' && t.f === f.id));
+    savePlaylist(); renderList(); renderSources();
+    status('Removed ' + f.name + ' and its tracks.');
+  });
+});
+$('#localItems').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  const item = b.closest('.item'); if(!item) return;
+  const d = localDirs.find(x => x.id === item.dataset.id); if(!d) return;
+  if(b.dataset.act === 'reconnect' || b.dataset.act === 'rescanl') scanDir(d, true);
+  if(b.dataset.act === 'forget') twoStep(b, 'SURE?', async () => {
+    localDirs = localDirs.filter(x => x !== d);
+    try{ await idb.del(d.id); }catch(err){}
+    renderSources(); status('DriveDeck will no longer remember ' + d.name + '. Its tracks stay in the playlist until you remove them.');
+  });
+});
+
+/* ============ saved playlists ============ */
+$('#pLists').addEventListener('click', () => { renderSaved(); dlgL.showModal(); });
+function renderSaved(){
+  $('#savedItems').innerHTML = savedLists.length ? savedLists.map((l, i) =>
+    '<div class="item" data-i="' + i + '"><span class="nm">' + esc(l.name) + '</span><span class="meta">' + l.items.length + ' tracks</span>' +
+    '<span class="row-btns"><button class="btn" type="button" data-act="load">LOAD</button><button class="btn" type="button" data-act="del">DELETE</button></span></div>'
+  ).join('') : '<p>No saved playlists yet. Your current playlist is kept automatically between visits.</p>';
+}
+$('#saveForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('#listName').value.trim(); if(!name) return;
+  if(!playlist.length){ status('The playlist is empty, so there’s nothing to save.'); return; }
+  const items = playlist.map(({k,t,id,f,n,s,d}) => ({k,t,id,f,n,s,d}));
+  const at = savedLists.findIndex(l => l.name.toLowerCase() === name.toLowerCase());
+  const rec = {name, at: Date.now(), items};
+  if(at >= 0) savedLists[at] = rec; else savedLists.unshift(rec);
+  LS.set('saved', savedLists); $('#listName').value = ''; renderSaved();
+  status('Saved “' + name + '”.');
+});
+$('#savedItems').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  const i = +b.closest('.item').dataset.i, l = savedLists[i]; if(!l) return;
+  if(b.dataset.act === 'load'){
+    doStop(); audio.removeAttribute('src'); audio.load();
+    playlist = l.items.map(x => ({...x})); currentKey = selectedKey = null; history = [];
+    savePlaylist(); renderList(); dlgL.close();
+    const na = playlist.filter(t => !avail(t)).length;
+    status('Loaded “' + l.name + '”.' + (na ? ' ' + na + ' tracks are offline until their source is connected.' : ''));
+  }
+  if(b.dataset.act === 'del') twoStep(b, 'SURE?', () => { savedLists.splice(i, 1); LS.set('saved', savedLists); renderSaved(); });
+});
+
+/* ============ controls ============ */
+$('#bPrev').addEventListener('click', prev);
+$('#bPlay').addEventListener('click', doPlay);
+$('#bPause').addEventListener('click', doPause);
+$('#bStop').addEventListener('click', doStop);
+$('#bNext').addEventListener('click', () => next(false));
+function renderToggles(){
+  $('#bShuf').setAttribute('aria-pressed', prefs.shuffle);
+  const rep = $('#bRep');
+  rep.setAttribute('aria-pressed', prefs.repeat !== 'off');
+  rep.textContent = prefs.repeat === 'one' ? 'REP 1' : 'REP';
+  rep.title = 'Repeat: ' + (prefs.repeat === 'off' ? 'off' : prefs.repeat === 'all' ? 'all tracks' : 'this track');
+  $('#tEq').setAttribute('aria-pressed', prefs.showEq); $('#eq').hidden = !prefs.showEq;
+  $('#tPl').setAttribute('aria-pressed', prefs.showPl); $('#pl').hidden = !prefs.showPl;
+  $('#eqOn').setAttribute('aria-pressed', prefs.eqOn);
+}
+$('#bShuf').addEventListener('click', () => { prefs.shuffle = !prefs.shuffle; history = []; savePrefs(); renderToggles(); });
+$('#bRep').addEventListener('click', () => { prefs.repeat = {off:'all', all:'one', one:'off'}[prefs.repeat]; savePrefs(); renderToggles(); });
+$('#tEq').addEventListener('click', () => { prefs.showEq = !prefs.showEq; savePrefs(); renderToggles(); });
+$('#tPl').addEventListener('click', () => { prefs.showPl = !prefs.showPl; savePrefs(); renderToggles(); });
+const vol = $('#vol'), bal = $('#bal');
+vol.value = prefs.vol; bal.value = prefs.bal;
+vol.addEventListener('input', () => { prefs.vol = +vol.value; applyAudio(); savePrefs(); status('Volume ' + prefs.vol + '%'); });
+bal.addEventListener('input', () => {
+  let v = +bal.value; if(Math.abs(v) < 6) v = 0; prefs.bal = v; applyAudio(); savePrefs();
+  status('Balance ' + (v === 0 ? 'center' : Math.abs(v) + '% ' + (v < 0 ? 'left' : 'right')));
+});
+bal.addEventListener('dblclick', () => { bal.value = 0; prefs.bal = 0; applyAudio(); savePrefs(); });
+
+/* equalizer UI */
+const bandsEl = $('#bands'), presetSel = $('#preset');
+presetSel.innerHTML = Object.keys(PRESETS).map(p => '<option>' + p + '</option>').join('') + '<option value="Custom">Custom</option>';
+bandsEl.innerHTML =
+  '<label class="band"><input id="eqPre" type="range" min="-12" max="12" step="0.5" aria-label="Preamp"><span>PRE</span></label>' +
+  FREQS.map((f, i) => '<label class="band"><input id="eq' + i + '" type="range" min="-12" max="12" step="0.5" aria-label="' + FLABEL[i] + ' Hz"><span>' + FLABEL[i] + '</span></label>').join('');
+function renderEq(){
+  $('#eqPre').value = prefs.pre;
+  prefs.eq.forEach((v, i) => { $('#eq' + i).value = v; });
+  presetSel.value = PRESETS[prefs.preset] ? prefs.preset : 'Custom';
+}
+bandsEl.addEventListener('input', e => {
+  const t = e.target;
+  if(t.id === 'eqPre') prefs.pre = +t.value;
+  else { prefs.eq[+t.id.slice(2)] = +t.value; prefs.preset = 'Custom'; presetSel.value = 'Custom'; }
+  applyAudio(); savePrefs();
+});
+bandsEl.addEventListener('dblclick', e => { if(e.target.type === 'range'){ e.target.value = 0; e.target.dispatchEvent(new Event('input', {bubbles:true})); } });
+presetSel.addEventListener('change', () => {
+  if(!PRESETS[presetSel.value]) return;
+  prefs.preset = presetSel.value; prefs.eq = PRESETS[prefs.preset].slice();
+  renderEq(); applyAudio(); savePrefs();
+});
+$('#eqReset').addEventListener('click', () => { prefs.preset = 'Flat'; prefs.eq = Array(10).fill(0); prefs.pre = 0; renderEq(); applyAudio(); savePrefs(); });
+$('#eqOn').addEventListener('click', () => { prefs.eqOn = !prefs.eqOn; applyAudio(); savePrefs(); renderToggles(); });
+
+/* keyboard: Z X C V B like the classics */
+document.addEventListener('keydown', e => {
+  if(e.target.closest('input, select, textarea, dialog') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  const map = {
+    z: prev, x: doPlay, c: doPause, v: doStop, b: () => next(false),
+    ' ': () => playState() === 'stop' ? doPlay() : doPause(),
+    arrowleft: () => { if(!stopped) audio.currentTime = Math.max(0, audio.currentTime - 5); },
+    arrowright: () => { if(!stopped && isFinite(audio.duration)) audio.currentTime = Math.min(audio.duration - 0.1, audio.currentTime + 5); },
+    arrowup: () => { vol.value = Math.min(100, prefs.vol + 5); vol.dispatchEvent(new Event('input')); },
+    arrowdown: () => { vol.value = Math.max(0, prefs.vol - 5); vol.dispatchEvent(new Event('input')); },
+    s: () => $('#bShuf').click(), r: () => $('#bRep').click()
+  };
+  if(e.target === listEl && (k === 'arrowup' || k === 'arrowdown')) return;
+  if(map[k]){ e.preventDefault(); map[k](); }
+});
+
+/* ============ start ============ */
+driveFolders = driveFolders.map(f => ({...f}));
+renderToggles(); renderEq(); renderList(true); renderState(); loadDirs();
+if(!playlist.length && !apiKey && !driveFolders.length) status('Welcome to DriveDeck. Press ADD to connect your music.', true);
+</script>
+</body>
+</html>
